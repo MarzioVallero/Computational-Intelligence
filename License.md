@@ -1,4 +1,4 @@
-####MIT License
+#### MIT License
 
 Copyright (c) 2022 Marzio Vallero
 
@@ -20,7 +20,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-####The following license is additionally reported to account for the portions of code provided by professor G. Squillero
+#### The following license is additionally reported to account for the portions of code provided by professor G. Squillero
 
 #### Copyright © 2021 by Giovanni Squillero.
 Permission to make digital or hard copies for personal or classroom
