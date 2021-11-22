@@ -5,7 +5,7 @@ This repository contains all the assignments and projects regarding computationa
 
 ## Installation
 
-Each python script or pyhton notebook can be downloaded as a standalone script and run.
+Each Python script or Python notebook can be downloaded as a standalone script and run.
 
 ## Usage
 
