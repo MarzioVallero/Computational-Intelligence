@@ -73,12 +73,9 @@ def manageInput():
                     if value not in ["green", "red", "blue", "yellow", "white"]:
                         print("Error: card color can only be green, red, blue, yellow or white")
                         continue
-                positions = []
-                for pos in command.split(" ")[4:]:
-                    positions.append(int(pos))
-                s.send(GameData.ClientHintData(playerName, destination, t, value, positions).serialize())
+                s.send(GameData.ClientHintData(playerName, destination, t, value).serialize())
             except:
-                print("Maybe you wanted to type 'hint <type> <destinatary> <value> <positions>'?")
+                print("Maybe you wanted to type 'hint <type> <destinatary> <value>'?")
                 continue
         elif command == "":
             print("[" + playerName + " - " + status + "]: ", end="")
@@ -118,13 +115,16 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             print("Current player: " + data.currentPlayer)
             print("Player hands: ")
             for p in data.players:
-                print(p.toString())
+                print(p.toClientString())
             print("Table cards: ")
-            for c in data.tableCards:
-                print("\t" + c.toString())
+            for pos in data.tableCards:
+                print(pos + ": [ ")
+                for c in data.tableCards[pos]:
+                    print(c.toClientString() + " ")
+                print("]")
             print("Discard pile: ")
             for c in data.discardPile:
-                print("\t" + c.toString())            
+                print("\t" + c.toClientString())            
             print("Note tokens used: " + str(data.usedNoteTokens) + "/8")
             print("Storm tokens used: " + str(data.usedStormTokens) + "/3")
         if type(data) is GameData.ServerActionInvalid:
@@ -144,11 +144,20 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             print("OH NO! The Gods are unhappy with you!")
         if type(data) is GameData.ServerHintData:
             dataOk = True
-            if data.destination == playerName:
-                print("Hint type: " + data.type)
-                print("Your cards with value " + str(data.value) + " are:")
-                for i in data.positions:
-                    print("\t" + str(i))
+            print("Hint type: " + data.type)
+            print("Player " + data.destination + " cards with value " + str(data.value) + " are:")
+            for i in data.positions:
+                print("\t" + str(i))
+        if type(data) is GameData.ServerInvalidDataReceived:
+            dataOk = True
+            print(data.data)
+        if type(data) is GameData.ServerGameOver:
+            dataOk = True
+            print(data.message)
+            print(data.score)
+            print(data.scoreMessage)
+            stdout.flush()
+            run = False
         if not dataOk:
             print("Unknown or unimplemented data type: " +  str(type(data)))
         print("[" + playerName + " - " + status + "]: ", end="")
