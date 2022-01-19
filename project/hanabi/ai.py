@@ -1,4 +1,10 @@
 #!/usr/bin/env python3
 
-def play(status, hintState):
+start = False 
+
+def play(status):
+    global start
+    if(status == "Lobby" and not start):
+        start = True
+        return "ready"
     return input()

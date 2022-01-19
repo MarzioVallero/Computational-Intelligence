@@ -6,6 +6,7 @@ import GameData
 import socket
 from constants import *
 import os
+import ai
 
 
 if len(argv) < 4:
@@ -31,7 +32,8 @@ def manageInput():
     global run
     global status
     while run:
-        command = input()
+        #command = input()
+        command = ai.play(status)
         # Choose data to send
         if command == "exit":
             run = False
