@@ -1,13 +1,12 @@
 #!/usr/bin/env python3
 
 from sys import argv, stdout
-from threading import Thread
+from threading import Thread, Semaphore
 import GameData
 import socket
 from constants import *
 import os
 import ai
-
 
 if len(argv) < 4:
     print("You need the player name to start the game.")
@@ -21,19 +20,29 @@ else:
     port = int(argv[2])
 
 run = True
-
 statuses = ["Lobby", "Game", "GameHint"]
-
 status = statuses[0]
-
-hintState = ("", "")
+hintMap = {}
+socketManager = Semaphore(0)
+inputManger = Semaphore(0)
 
 def manageInput():
     global run
     global status
+    global hintMap
+    playerName = argv[3]
 
     while run:
-        command = input()
+        inputManger.acquire()
+        s.send(GameData.ClientGetGameStateRequest(playerName).serialize())
+        data = s.recv(DATASIZE)
+        data = GameData.GameData.deserialize(data)
+
+        if type(data) is GameData.ServerGameStateData and data.currentPlayer == playerName:
+            command = ai.play(playerName, status, data, hintMap)
+        else:
+            socketManager.release()
+            continue
 
         # Choose data to send
         if command == "exit":
@@ -87,6 +96,8 @@ def manageInput():
             continue
         stdout.flush()
 
+        socketManager.release()
+
 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
     request = GameData.ClientPlayerAddData(playerName)
     s.connect((HOST, PORT))
@@ -97,6 +108,18 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         print("Connection accepted by the server. Welcome " + playerName)
     print("[" + playerName + " - " + status + "]: ", end="")
     Thread(target=manageInput).start()
+    s.send(GameData.ClientPlayerStartRequest(playerName).serialize())
+    data = s.recv(DATASIZE)
+    data = GameData.GameData.deserialize(data)
+    if type(data) is GameData.ServerPlayerStartRequestAccepted:
+        print("Ready: " + str(data.acceptedStartRequests) + "/"  + str(data.connectedPlayers) + " players")
+        data = s.recv(DATASIZE)
+        data = GameData.GameData.deserialize(data)
+    if type(data) is GameData.ServerStartGameData:
+        print("Game start!")
+        s.send(GameData.ClientPlayerReadyData(playerName).serialize())
+        status = statuses[1]
+    #print("[" + playerName + " - " + status + "]: ", end="")
     while run:
         dataOk = False
         data = s.recv(DATASIZE)
@@ -130,6 +153,8 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                 print("\t" + c.toClientString())            
             print("Note tokens used: " + str(data.usedNoteTokens) + "/8")
             print("Storm tokens used: " + str(data.usedStormTokens) + "/3")
+            inputManger.release()
+            socketManager.acquire()
         if type(data) is GameData.ServerActionInvalid:
             dataOk = True
             print("Invalid action performed. Reason:")
@@ -151,6 +176,15 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             print("Player " + data.destination + " cards with value " + str(data.value) + " are:")
             for i in data.positions:
                 print("\t" + str(i))
+            # Update the hintMap
+            if data.destination not in hintMap:
+                hintMap[data.destination] = [[None, None], [None, None], [None, None], [None, None], [None, None]]
+            else:
+                for pos in data.positions:
+                    if data.type == "value":
+                        hintMap[data.destination][pos][0] = data.value
+                    elif data.type == "color" or data.type == "colour":
+                        hintMap[data.destination][pos][1] = data.value
         if type(data) is GameData.ServerInvalidDataReceived:
             dataOk = True
             print(data.data)
