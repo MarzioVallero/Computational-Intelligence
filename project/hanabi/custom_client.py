@@ -2,6 +2,7 @@
 
 from sys import argv, stdout
 from threading import Thread, Semaphore
+
 import GameData
 import socket
 from constants import *
@@ -34,6 +35,7 @@ def manageInput():
 
     while run:
         inputManger.acquire()
+        print("Input manager alive")
         s.send(GameData.ClientGetGameStateRequest(playerName).serialize())
         data = s.recv(DATASIZE)
         data = GameData.GameData.deserialize(data)
@@ -50,23 +52,29 @@ def manageInput():
             os._exit(0)
         elif command == "ready" and status == statuses[0]:
             s.send(GameData.ClientPlayerStartRequest(playerName).serialize())
+            socketManager.release()
         elif command == "show" and status == statuses[1]:
             s.send(GameData.ClientGetGameStateRequest(playerName).serialize())
+            socketManager.release()
         elif command.split(" ")[0] == "discard" and status == statuses[1]:
             try:
                 cardStr = command.split(" ")
                 cardOrder = int(cardStr[1])
                 s.send(GameData.ClientPlayerDiscardCardRequest(playerName, cardOrder).serialize())
+                socketManager.release()
             except:
                 print("Maybe you wanted to type 'discard <num>'?")
+                inputManger.release()
                 continue
         elif command.split(" ")[0] == "play" and status == statuses[1]:
             try:
                 cardStr = command.split(" ")
                 cardOrder = int(cardStr[1])
                 s.send(GameData.ClientPlayerPlayCardRequest(playerName, cardOrder).serialize())
+                socketManager.release()
             except:
                 print("Maybe you wanted to type 'play <num>'?")
+                inputManger.release()
                 continue
         elif command.split(" ")[0] == "hint" and status == statuses[1]:
             try:
@@ -74,29 +82,34 @@ def manageInput():
                 t = command.split(" ")[1].lower()
                 if t != "colour" and t != "color" and t != "value":
                     print("Error: type can be 'color' or 'value'")
+                    inputManger.release()
                     continue
                 value = command.split(" ")[3].lower()
                 if t == "value":
                     value = int(value)
                     if int(value) > 5 or int(value) < 1:
                         print("Error: card values can range from 1 to 5")
+                        inputManger.release()
                         continue
                 else:
                     if value not in ["green", "red", "blue", "yellow", "white"]:
                         print("Error: card color can only be green, red, blue, yellow or white")
+                        inputManger.release()
                         continue
                 s.send(GameData.ClientHintData(playerName, destination, t, value).serialize())
+                socketManager.release()
             except:
                 print("Maybe you wanted to type 'hint <type> <destinatary> <value>'?")
+                inputManger.release()
                 continue
         elif command == "":
             print("[" + playerName + " - " + status + "]: ", end="")
+            inputManger.release()
         else:
             print("Unknown command: " + command)
+            inputManger.release()
             continue
         stdout.flush()
-
-        socketManager.release()
 
 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
     request = GameData.ClientPlayerAddData(playerName)
@@ -119,8 +132,11 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         print("Game start!")
         s.send(GameData.ClientPlayerReadyData(playerName).serialize())
         status = statuses[1]
-    #print("[" + playerName + " - " + status + "]: ", end="")
+    print("[" + playerName + " - " + status + "]: ", end="")
+    inputManger.release()
+    socketManager.acquire()
     while run:
+        print("socket manager alive")
         dataOk = False
         data = s.recv(DATASIZE)
         if not data:
@@ -179,12 +195,13 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             # Update the hintMap
             if data.destination not in hintMap:
                 hintMap[data.destination] = [[None, None], [None, None], [None, None], [None, None], [None, None]]
-            else:
-                for pos in data.positions:
-                    if data.type == "value":
-                        hintMap[data.destination][pos][0] = data.value
-                    elif data.type == "color" or data.type == "colour":
-                        hintMap[data.destination][pos][1] = data.value
+            for pos in data.positions:
+                if data.type == "value":
+                    hintMap[data.destination][pos][0] = data.value
+                elif data.type == "color" or data.type == "colour":
+                    hintMap[data.destination][pos][1] = data.value
+            inputManger.release()
+            socketManager.acquire()
         if type(data) is GameData.ServerInvalidDataReceived:
             dataOk = True
             print(data.data)

@@ -6,7 +6,6 @@ import GameData
 import socket
 from constants import *
 import os
-import ai
 
 
 if len(argv) < 4:
@@ -31,10 +30,8 @@ hintState = ("", "")
 def manageInput():
     global run
     global status
-
     while run:
         command = input()
-
         # Choose data to send
         if command == "exit":
             run = False
@@ -98,6 +95,7 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
     print("[" + playerName + " - " + status + "]: ", end="")
     Thread(target=manageInput).start()
     while run:
+        print("socket manager alive")
         dataOk = False
         data = s.recv(DATASIZE)
         if not data:
