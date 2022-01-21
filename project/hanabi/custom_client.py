@@ -24,6 +24,8 @@ run = True
 statuses = ["Lobby", "Game", "GameHint"]
 status = statuses[0]
 hintMap = {}
+# deduction status: for each card, note status (playable, happy discard, discard, sad discard) and optimistic
+deductionStatus = [[None, False], [None, False], [None, False], [None, False], [None, False]]
 socketManager = Semaphore(0)
 inputManger = Semaphore(0)
 
@@ -41,7 +43,7 @@ def manageInput():
         data = GameData.GameData.deserialize(data)
 
         if type(data) is GameData.ServerGameStateData and data.currentPlayer == playerName:
-            command = ai.play(playerName, status, data, hintMap)
+            command = ai.play(playerName, status, data, hintMap, deductionStatus)
         else:
             socketManager.release()
             continue
@@ -194,12 +196,18 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                 print("\t" + str(i))
             # Update the hintMap
             if data.destination not in hintMap:
-                hintMap[data.destination] = [[None, None], [None, None], [None, None], [None, None], [None, None]]
+                # first value, then colour, then lastHinted
+                hintMap[data.destination] = [[None, None, False], [None, None, False], [None, None, False], [None, None, False], [None, None, False]]
             for pos in data.positions:
                 if data.type == "value":
                     hintMap[data.destination][pos][0] = data.value
                 elif data.type == "color" or data.type == "colour":
                     hintMap[data.destination][pos][1] = data.value
+            for i in range(5):
+                if i in data.positions:
+                    hintMap[data.destination][pos][2] = True
+                else:
+                    hintMap[data.destination][pos][2] = False
             inputManger.release()
             socketManager.acquire()
         if type(data) is GameData.ServerInvalidDataReceived:
