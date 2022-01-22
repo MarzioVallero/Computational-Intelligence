@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 
 import itertools
-
-from matplotlib.pyplot import table
 import GameData
 
 colors = ["green", "red", "blue", "yellow", "white"]
@@ -143,8 +141,58 @@ def playerKnowsWhatToPlay(playerName, game_data, hintMap):
             hasOptimistPlayableCard = True
     return hasOptimistPlayableCard
 
-def findGivableHint(playerName, game_data, hintMap):
-    
+# Find the first playable card and give a hint on it. If possible, give an optimistic hint
+def findGivableHint(playerName, playerIndex, game_data, hintMap, deductions):
+    # While we have not reached the second hinted card
+    isFirstHintedCardOrBefore = True
+    hasPlayableCard = False
+    for i in range(5):
+        card = hintMap[playerName][i]
+        if (isCardPlayable(card, game_data)):
+            hasPlayableCard = True
+            # We don't hint the first hinted card
+            shouldHint = (card[1] == None and card[0] == None) if isFirstHintedCardOrBefore else (card[1] == None or card[0] == None)
+
+            if shouldHint :
+                # Find the type of hint to give, trying to find the most optimist one
+                # (if there's a card with the same color, give the number hint)
+                hintType = None
+                hintContent = None
+                cardTruthValues = game_data.player[playerIndex].hand[i]
+                sameColor = 0
+                for c in hintMap[playerName]:
+                    if(c[1] == card[1]):
+                        sameColor = sameColor + 1
+                if (sameColor > 1):
+                    hintType = "value" if (card[0] == None) else "color"
+                    hintContent = cardTruthValues.value if (card[0] == None) else cardTruthValues.color
+                else:
+                    hintType = "color" if (card[1] == None) else "value"
+                    hintContent = cardTruthValues.color if (card[1] == None) else cardTruthValues.value
+                return f"hint {hintType} {playerName} {hintContent}"
+
+        # If the card has hints, we switch the condition
+        if (card[1] == None or card[0] == None):
+            isFirstHintedCardOrBefore = False
+
+    # Give a hint on the last card to avoid discard if possible
+    lastCardPos = len(game_data.player[playerIndex].hand) - 1
+    lastCard = hintMap[playerName][lastCardPos]
+    lastCardTruthValues = game_data.player[playerIndex].hand[lastCardPos]
+    if (isCardDangerous(lastCard, game_data) and lastCard[1] == None and
+        lastCard[0] == None and not hasPlayableCard):
+        hintType = None
+        hintContent = None
+        cardTruthValues = game_data.player[playerIndex].hand[i]
+        # if it's a 5 and the number hint is not given
+        if (lastCard[0] == 5 or lastCard[0] == None):
+            hintType = "value"
+            hintContent = lastCardTruthValues.value
+        else:
+            hintType = "color"
+            hintContent = lastCardTruthValues.color
+        return f"hint {hintType} {playerName} {hintContent}"
+
     return None
 
 def play(playerName, status, game_data, hintMap, deductionStatus):
@@ -187,15 +235,18 @@ def play(playerName, status, game_data, hintMap, deductionStatus):
     # If there are hints available, give one
     if (game_data.usedNoteTokens < 8):
         # If someone has a playable card (but with some hint uncertainty), give hint
+        index = -1
         for player in game_data.players:
+            index = index + 1
             if(player.name == playerName):
                 continue
             if (not playerKnowsWhatToPlay(player.name, game_data, hintMap)):
-                action = findGivableHint(player.name, game_data, hintMap)
+                action = findGivableHint(player.name, index, game_data, hintMap, deductions)
                 if (action != None):
                     return action
 
     # Discard safe card, if any
+    
 
 
     # If 1st play and no playable cards in next player hand, give a hint on 5s or 2s
