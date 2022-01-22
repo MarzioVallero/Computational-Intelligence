@@ -146,7 +146,7 @@ def findGivableHint(playerName, playerIndex, game_data, hintMap, deductions):
     # While we have not reached the second hinted card
     isFirstHintedCardOrBefore = True
     hasPlayableCard = False
-    for i in range(5):
+    for i in range(len(game_data.player[playerIndex].hand)):
         card = hintMap[playerName][i]
         if (isCardPlayable(card, game_data)):
             hasPlayableCard = True
@@ -195,6 +195,41 @@ def findGivableHint(playerName, playerIndex, game_data, hintMap, deductions):
 
     return None
 
+def findBestDiscardIndex(playerName, game_data, hintMap, deductions):
+    uncluedDiscardableCard = False
+    discardableIndex = -1
+
+    playerIndex = None
+    for i in range(len(game_data.players)):
+        if (game_data.players[i].name == playerName):
+            playerIndex = i
+            break
+    if (playerIndex != None):
+        return discardableIndex
+
+    for i in range(len(game_data.player[playerIndex].hand)):
+        card = hintMap[playerName][i]
+        # If the card is definitely discardable (never playable)
+        discardable = True
+        for deduction in deductions[i]:
+            if (isCardEverPlayable((deduction[0], deduction[1]), game_data)):
+                discardable = False
+        if discardable:
+            discardableIndex = i
+            break
+
+        # If the card is unclued and not dangerous
+        if (isCardDiscardable(deductions, game_data) and card[1] == None and
+            card[0] == None and not uncluedDiscardableCard):
+            uncluedDiscardableCard = True
+            discardableIndex = i
+
+        # If it's the first discardable card we find, regardless of being already clued
+        if (isCardDiscardable(deductions, game_data) and discardableIndex == -1):
+            discardableIndex = i
+
+    return discardableIndex
+
 def play(playerName, status, game_data, hintMap, deductionStatus):
     print(playerName, status, test(game_data), hintMap, deductionStatus)
 
@@ -223,7 +258,7 @@ def play(playerName, status, game_data, hintMap, deductionStatus):
     # If strike tokens < 2, try to play an optimistic card
     if (game_data.usedStormTokens < 2 and len(lastOptimisticCards) > 0):
         # find the most recent optimist card that may be playable and play it
-        for card in lastOptimisticCards:
+        for i in lastOptimisticCards:
             playable = False
             for deduction in deductions[i]:
                 if (isCardPlayable(deduction, game_data.tableCards) and not isLastDiscardableCard(deductions[i], game_data)):
@@ -246,10 +281,13 @@ def play(playerName, status, game_data, hintMap, deductionStatus):
                     return action
 
     # Discard safe card, if any
-    
-
+    if (game_data.usedNoteTokens > 0):
+        discardableIndex = findBestDiscardIndex(playerName, game_data, hintMap, deductions)
+        if (discardableIndex > -1):
+            return f"discard {discardableIndex}"
 
     # If 1st play and no playable cards in next player hand, give a hint on 5s or 2s
+
 
 
     # If none of the above, play a random card
