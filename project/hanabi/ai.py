@@ -35,19 +35,19 @@ def stackToTupleList(stack):
         tupleList.append((card.value, card.color))
     return tupleList
 
-# TO REMOVE
-def test(data):
+def isFirstMove(data):
     tableCards = []
     for color in colors:
         for number in data.tableCards[color]:
             tableCards.append((number, color))
-    otherPlayerCards = []
-    for player in data.players:
-        otherPlayerCards.append(stackToTupleList(player.hand))
     discardedCards = stackToTupleList(data.discardPile)
-    tableCards.extend(card for card in otherPlayerCards if card not in tableCards)
-    tableCards.extend(card for card in discardedCards if card not in tableCards)
-    return tableCards
+
+    print(tableCards, discardedCards)
+
+    if (len(tableCards) == 0 and len(discardedCards) == 0 and data.usedNoteTokens == 0 and data.usedStormTokens == 0):
+        return True
+    else:
+        return False
 
 def isCardDiscardable(deductions, game_data):
     # AI can discard a card that can never be played (already played or because of other discards)
@@ -231,7 +231,7 @@ def findBestDiscardIndex(playerName, game_data, hintMap, deductions):
     return discardableIndex
 
 def play(playerName, status, game_data, hintMap, deductionStatus):
-    print(playerName, status, test(game_data), hintMap, deductionStatus)
+    print(playerName, status, isFirstMove(game_data), hintMap, deductionStatus)
 
     # A hidden card has an array of deductions, i.e. possible values with deduction levels
     # A hidden card is said to be "optimistic" when it's (one of) the last card(s) that was designated for a hint
@@ -287,10 +287,23 @@ def play(playerName, status, game_data, hintMap, deductionStatus):
             return f"discard {discardableIndex}"
 
     # If 1st play and no playable cards in next player hand, give a hint on 5s or 2s
-
-
+    if (isFirstMove(game_data)):
+        for player in game_data.players:
+            index = index + 1
+            if(player.name == playerName):
+                continue
+            nextPlayerHand = game_data.players[index].hand
+            index = -1
+            for card in nextPlayerHand:
+                index = index + 1
+                if (card.value == 5):
+                    return f"hint value {game_data.players[index].name} 5"
+            # If next player has no 5, give a hint on 2s (positive or negative)
+            index = -1
+            for card in nextPlayerHand:
+                index = index + 1
+                if (card.value == 2):
+                    return f"hint value {game_data.players[index].name} 2"
 
     # If none of the above, play a random card
-
-    
-    return input()
+    return "play 0"
