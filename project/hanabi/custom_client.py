@@ -177,6 +177,7 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             dataOk = True
             print("Invalid action performed. Reason:")
             print(data.message)
+        # This is used to manage discard commands, why there is no report for which card has been discarded????
         if type(data) is GameData.ServerActionValid:
             dataOk = True
             print("Action valid!")
