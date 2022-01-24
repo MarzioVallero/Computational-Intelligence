@@ -182,20 +182,32 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             dataOk = True
             print(f"{data.lastPlayer} discarded card number {data.cardHandIndex}")
             print("Current player: " + data.player)
-            hintMap[data.lastPlayer][data.cardHandIndex] = [None, None, False]
+            if data.lastPlayer not in hintMap:
+                hintMap[data.lastPlayer] = []
+                for i in range(5):
+                    hintMap[data.lastPlayer].append([[1, 2, 3, 4, 5], ["green", "red", "blue", "yellow", "white"], False])
+            hintMap[data.lastPlayer][data.cardHandIndex] = [[1, 2, 3, 4, 5], ["green", "red", "blue", "yellow", "white"], False]
             inputManger.release()
             socketManager.acquire()
         if type(data) is GameData.ServerPlayerMoveOk:
             dataOk = True
             print("Nice move!")
             print("Current player: " + data.player)
-            hintMap[data.lastPlayer][data.cardHandIndex] = [None, None, False]
+            if data.lastPlayer not in hintMap:
+                hintMap[data.lastPlayer] = []
+                for i in range(5):
+                    hintMap[data.lastPlayer].append([[1, 2, 3, 4, 5], ["green", "red", "blue", "yellow", "white"], False])
+            hintMap[data.lastPlayer][data.cardHandIndex] = [[1, 2, 3, 4, 5], ["green", "red", "blue", "yellow", "white"], False]
             inputManger.release()
             socketManager.acquire()
         if type(data) is GameData.ServerPlayerThunderStrike:
             dataOk = True
             print("OH NO! The Gods are unhappy with you!")
-            hintMap[data.lastPlayer][data.cardHandIndex] = [None, None, False]
+            if data.lastPlayer not in hintMap:
+                hintMap[data.lastPlayer] = []
+                for i in range(5):
+                    hintMap[data.lastPlayer].append([[1, 2, 3, 4, 5], ["green", "red", "blue", "yellow", "white"], False])
+            hintMap[data.lastPlayer][data.cardHandIndex] = [[1, 2, 3, 4, 5], ["green", "red", "blue", "yellow", "white"], False]
             inputManger.release()
             socketManager.acquire()
         if type(data) is GameData.ServerHintData:
@@ -206,18 +218,23 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                 print("\t" + str(i))
             # Update the hintMap
             if data.destination not in hintMap:
-                # first value, then colour, then lastHinted
-                hintMap[data.destination] = [[None, None, False], [None, None, False], [None, None, False], [None, None, False], [None, None, False]]
-            for pos in data.positions:
-                if data.type == "value":
-                    hintMap[data.destination][pos][0] = data.value
-                elif data.type == "color" or data.type == "colour":
-                    hintMap[data.destination][pos][1] = data.value
+                # first all possible values, then all possible colours, then lastHinted
+                hintMap[data.destination] = []
+                for i in range(5):
+                    hintMap[data.destination].append([[1, 2, 3, 4, 5], ["green", "red", "blue", "yellow", "white"], False])
             for i in range(5):
                 if i in data.positions:
-                    hintMap[data.destination][pos][2] = True
+                    hintMap[data.destination][i][2] = True
+                    if data.type == "value":
+                        hintMap[data.destination][i][0] = [data.value]
+                    elif data.type == "color" or data.type == "colour":
+                        hintMap[data.destination][i][1] = [data.value]
                 else:
-                    hintMap[data.destination][pos][2] = False
+                    hintMap[data.destination][i][2] = False
+                    if (data.type == "value") and (data.value in hintMap[data.destination][i][0]):
+                        hintMap[data.destination][i][0].remove(data.value)
+                    elif (data.type == "color" or data.type == "colour") and (data.value in hintMap[data.destination][i][1]):
+                        hintMap[data.destination][i][1].remove(data.value)
             inputManger.release()
             socketManager.acquire()
         if type(data) is GameData.ServerInvalidDataReceived:
