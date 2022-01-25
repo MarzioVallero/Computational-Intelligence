@@ -2,7 +2,7 @@
 
 from sys import argv, stdout
 from threading import Thread, Semaphore
-
+from time import sleep
 import GameData
 import socket
 from constants import *
@@ -26,6 +26,7 @@ status = statuses[0]
 hintMap = {}
 socketManager = Semaphore(0)
 inputManger = Semaphore(0)
+numGames = 0
 
 def manageInput():
     global run
@@ -43,7 +44,8 @@ def manageInput():
         if type(data) is GameData.ServerGameStateData and data.currentPlayer == playerName:
             command = ai.play(playerName, status, data, hintMap)
             print(f"AI chosen command: {command}")
-            a = input()
+            # Used to block before executing each command
+            #a = input()
         else:
             socketManager.release()
             continue
@@ -260,6 +262,19 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             stdout.flush()
             #run = False
             print("Ready for a new game!")
+            if (playerName == "Player0"):
+                with open("results.dat", "a") as myfile:
+                    myfile.write(f"{data.score}\n")
+            numGames = numGames + 1
+            if(numGames == 100):
+                run = False
+                os._exit(0)
+            hintMap = {}
+            if data.score == 0:
+                input()
+            sleep(1)
+            inputManger.release()
+            socketManager.acquire()
         if not dataOk:
             print("Unknown or unimplemented data type: " +  str(type(data)))
         print("[" + playerName + " - " + status + "]: ", end="")

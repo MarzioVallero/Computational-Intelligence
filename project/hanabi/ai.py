@@ -103,10 +103,6 @@ def getDeductions(playerName, game_data, hintMap):
     combinations = [(i, v, c) for i in range(game_data.handSize) for v in numbers for c in colors]
     possibleCards = getPossibleCards(game_data)
     for (i, v, c) in combinations:
-        if(playerName not in hintMap):
-            hintMap[playerName] = []
-            for i in range(5):
-                hintMap[playerName].append([[1, 2, 3, 4, 5], ["green", "red", "blue", "yellow", "white"], False])
         if (i not in deductions):
                     deductions[i] = []
         if ((v in hintMap[playerName][i][0]) and (c in hintMap[playerName][i][1]) and isCardPossible(v, c, possibleCards)):
@@ -186,9 +182,9 @@ def isCardEverPlayable(cardInfo, game_data):
     elif (len(tableCards) < cardInfo[0] - 1):
         # Check whether the cards in between have been discarded
         # e.g. the game pile is a 3 Red, both Red 4s in the discard, and I have a 5 Red in hand
+        discardedCards = stackToTupleList(game_data.discardPile)
         for i in range(len(tableCards)+1, cardInfo[0]):
-            discardedCards = stackToTupleList(game_data.discardPile)
-            discarded = len([card for card in discardedCards if (card[0] == i and card[1] == cardInfo[1])])
+            discarded = len([card for card in discardedCards if (card[0] == cardInfo[0] and card[1] == cardInfo[1])])
             if (discarded == numberFrequency[i-1]):
                 return False
     return True
@@ -208,7 +204,6 @@ def playerKnowsWhatToPlay(playerName, index, game_data, hintMap):
         hintMap[playerName] = []
         for i in range(5):
             hintMap[playerName].append([[1, 2, 3, 4, 5], ["green", "red", "blue", "yellow", "white"], False])
-        return False
     cardIndex = -1
     for card in game_data.players[index].hand:
         cardIndex = cardIndex + 1
@@ -295,7 +290,7 @@ def findBestDiscardIndex(playerName, game_data, hintMap, deductions):
     if (playerIndex == None):
         return discardableIndex
 
-    for i in range(len(game_data.players[playerIndex].hand)):
+    for i in range(game_data.handSize):
         cardHints = hintMap[playerName][i]
         # If the card is definitely discardable (none of its deductions are playable)
         discardable = True
@@ -303,37 +298,63 @@ def findBestDiscardIndex(playerName, game_data, hintMap, deductions):
             if (isCardEverPlayable(deduction, game_data)):
                 discardable = False
         if discardable:
-            discardableIndex = i
-            break
+            return i
 
         # If the card is unclued and not dangerous
         if (isCardDiscardable(deductions[i], game_data) and len(cardHints[1]) > 1 and
             len(cardHints[0]) > 1 and not uncluedDiscardableCard):
             uncluedDiscardableCard = True
             discardableIndex = i
-            break
 
         # If it's the first discardable card we find, regardless of being already clued
         if (isCardDiscardable(deductions[i], game_data) and discardableIndex == -1):
             discardableIndex = i
-            break
 
     return discardableIndex
+
+
+def findDiscardIndex(playerName, game_data, hintMap):
+    discardIndex = -1
+
+    playerIndex = None
+    for i in range(len(game_data.players)):
+        if (game_data.players[i].name == playerName):
+            playerIndex = i
+            break
+    # PlayerName doesn't exist
+    if (playerIndex == None):
+        return -1
+
+    leastHintCount = 0
+    # Discard the card of which I know least
+    for i in range(game_data.handSize):
+        numValueHints = len(hintMap[playerName][i][0])
+        numColorHints = len(hintMap[playerName][i][1])
+        newHintCount = numValueHints + numColorHints
+        if ((newHintCount > leastHintCount) and (numValueHints > 1) and (numColorHints > 1)):
+            leastHintCount = newHintCount
+            discardIndex = i
+    return discardIndex
 
 # If all cards of a given value or color have been played,
 # implicitly I know they can't be among my cards
 def updateHintMap(game_data, hintMap, playerName):
+    if(playerName not in hintMap):
+        hintMap[playerName] = []
+        for i in range(5):
+            hintMap[playerName].append([[1, 2, 3, 4, 5], ["green", "red", "blue", "yellow", "white"], False])
+        return hintMap
     possibleCards = getPossibleCards(game_data)
     for value in numbers:
         count = sum(map(lambda x : x[0] == value, possibleCards))
         if count == 0:
-            for i in range(5):
+            for i in range(game_data.handSize):
                 if value in hintMap[playerName][i][0]:
                     hintMap[playerName][i][0].remove(value)
     for color in colors:
         count = sum(map(lambda x : x[1] == color, possibleCards))
         if count == 0:
-            for i in range(5):
+            for i in range(game_data.handSize):
                 if color in hintMap[playerName][i][1]:
                     hintMap[playerName][i][1].remove(color)
     return hintMap
@@ -358,7 +379,7 @@ def play(playerName, status, game_data, hintMap):
     # When there are several possible deductions for a card, we always assume that playing it/ discarding it
     # leads to the worst possible outcome, unless it's an optimist card in which case we trust our partners :)
     # Before playing, each deduction will be assigned a status (IDeductionStatus)
-    # (playing a 5) > (playing a playable card) > (happy discard) > (giving a hint) > (discard) > (sad discard)
+    # (playing a 5) > (playing a playable card) > (happy discard) > (giving a hint) > (discard) > (sad discard) > (sad hint)
 
     # Get statistics
     lastOptimisticCards = getLastOptimistCardsOfPlayer(hintMap, playerName)
@@ -379,8 +400,8 @@ def play(playerName, status, game_data, hintMap):
             print("Definitely playable card ")
             return f"play {i}"
 
-    # If strike tokens < 2, try to play an optimistic card
-    if (game_data.usedStormTokens < 2 and len(lastOptimisticCards) == 1):
+    # If storm tokens < 2, try to play an optimistic card
+    if (game_data.usedStormTokens < 2):
         # find the most recent optimist card that may be playable and play it
         for i in lastOptimisticCards:
             # Count positive cases vs all cases
@@ -407,33 +428,59 @@ def play(playerName, status, game_data, hintMap):
                 if (action != None):
                     return action
 
-    # TODO: nothing gets ever discarded, WHY?
     # Discard safe card, if any
     if (game_data.usedNoteTokens > 0):
         discardableIndex = findBestDiscardIndex(playerName, game_data, hintMap, deductions)
-        if (discardableIndex > -1):
-            print("Discard card ")
+        if (discardableIndex != -1):
+            print("Discard card type 1")
             return f"discard {discardableIndex}"
 
-    # If 1st play and no playable cards in next player hand, give a hint on 5s or 2s
-    if (isFirstMove(game_data)):
+    # If 1st play or I got nothing better to do, give a hint on unhinted 5s or 2s
+    if (isFirstMove(game_data) or game_data.usedNoteTokens < 8):
         index = -1
         for player in game_data.players:
             index = index + 1
             if(player.name == playerName):
                 continue
             nextPlayerHand = game_data.players[index].hand
+            cardIndex = -1
             for card in nextPlayerHand:
-                if (card.value == 5):
+                cardIndex = cardIndex + 1
+                if (card.value == 5 and len(hintMap[player.name][cardIndex][0]) > 1):
                     print("First move hint ")
                     return f"hint value {player.name} 5"
+                elif (card.value == 5 and len(hintMap[player.name][cardIndex][1]) > 1):
+                    print("Give hint type 3")
+                    return f"hint color {player.name} {card.color}"
             # If next player has no 5, give a hint on 2s (positive or negative)
+            cardIndex = -1
             for card in nextPlayerHand:
-                if (card.value == 2):
+                cardIndex = cardIndex + 1
+                if (card.value == 2 and len(hintMap[player.name][cardIndex][0]) > 1):
                     print("First move hint ")
                     return f"hint value {player.name} 2"
+                elif (card.value == 2 and len(hintMap[player.name][cardIndex][1]) > 1):
+                    print("Give hint type 4")
+                    return f"hint color {player.name} {card.color}"
 
-    # If none of the above, play a random card
+    # Discard a card only based on how little I know about it 
+    # (dangerous cards should be always hinted to immediately)
+    #if (game_data.usedNoteTokens > 0):
+    #    discardableIndex = findDiscardIndex(playerName, game_data, hintMap)
+    #    if (discardableIndex != -1):
+    #        print("Discard card type 2")
+    #        return f"discard {discardableIndex}"
+
+    # If none of the above, do a random action
+    # Just avoid getting a 0 score
     print("DESPERATE MOVE")
-    randomChoice = random.choice(range(5))
-    return f"play {randomChoice}"
+    randomChoice = random.choice(range(game_data.handSize))
+    randomOtherPlayer = random.choice([player for player in game_data.players if player.name != playerName])
+    randomType = random.choice(["value", "color"])
+    randomHint = randomOtherPlayer.hand[0].value if randomType == "value" else randomOtherPlayer.hand[0].color
+    if (game_data.usedStormTokens < 2):
+        return f"play {randomChoice}"
+    elif (game_data.usedNoteTokens > 0):
+        return f"discard {randomChoice}"
+    else:
+        return f"hint {randomType} {randomOtherPlayer.name} {randomHint}"
