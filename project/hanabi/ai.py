@@ -202,20 +202,20 @@ def isCardDangerous(cardInfo, game_data):
         return True
     return False
 
+# If player's last hinted card is playable, return True. Else False.
 def playerKnowsWhatToPlay(playerName, index, game_data, hintMap):
-    hasOptimistPlayableCard = False
     if(playerName not in hintMap):
         hintMap[playerName] = []
         for i in range(5):
             hintMap[playerName].append([[1, 2, 3, 4, 5], ["green", "red", "blue", "yellow", "white"], False])
-        return hasOptimistPlayableCard
+        return False
     cardIndex = -1
     for card in game_data.players[index].hand:
         cardIndex = cardIndex + 1
         cardTruth = (card.value, card.color)
         if (hintMap[playerName][cardIndex][2] == True and isCardPlayable(cardTruth, game_data)):
-            hasOptimistPlayableCard = True
-    return hasOptimistPlayableCard
+            return True
+    return False
 
 # Find the first playable card and give a hint on it. If possible, give an optimistic hint
 def findGivableHint(playerName, playerIndex, game_data, hintMap):
@@ -223,8 +223,8 @@ def findGivableHint(playerName, playerIndex, game_data, hintMap):
     isFirstHintedCardOrBefore = True
     hasPlayableCard = False
     for i in range(len(game_data.players[playerIndex].hand)):
-        cardTruthValues = game_data.players[playerIndex].hand[i]
-        card = (cardTruthValues.value, cardTruthValues.color)
+        card = game_data.players[playerIndex].hand[i]
+        card = (card.value, card.color)
         cardHints = hintMap[playerName][i]
         if (isCardPlayable(card, game_data)):
             hasPlayableCard = True
@@ -237,17 +237,21 @@ def findGivableHint(playerName, playerIndex, game_data, hintMap):
                 hintType = None
                 hintContent = None
                 sameColor = 0
-                # Why not iterate over all cards in hand? "i" vs "len(game_data.players[playerIndex].hand)""
-                for cardIndex in range(0, len(game_data.players[playerIndex].hand)):
+                sameValue = 0
+                # Why not iterate over all cards in hand? "i" vs "len(game_data.players[playerIndex].hand)"
+                for cardIndex in range(0, i):
                     c = game_data.players[playerIndex].hand[cardIndex]
                     if(c.color == card[1]):
                         sameColor = sameColor + 1
+                    if(c.value == card[0]):
+                        sameValue = sameValue + 1
                 if (sameColor > 1):
                     hintType = "value" if (len(cardHints[0]) > 1) else "color"
-                    hintContent = cardTruthValues.value if (len(cardHints[0]) > 1) else cardTruthValues.color
+                    hintContent = card[0] if (len(cardHints[0]) > 1) else card[1]
                 else:
                     hintType = "color" if (len(cardHints[1]) > 1) else "value"
-                    hintContent = cardTruthValues.color if (len(cardHints[1]) > 1) else cardTruthValues.value
+                    hintContent = card[1] if (len(cardHints[1]) > 1) else card[0]
+                print("Give hint type 1")
                 return f"hint {hintType} {playerName} {hintContent}"
 
         # If the card has hints, we switch the condition
@@ -257,10 +261,10 @@ def findGivableHint(playerName, playerIndex, game_data, hintMap):
     # Give a hint on the last card to avoid discard if possible
     lastCardPos = len(game_data.players[playerIndex].hand) - 1
     lastCardHints = hintMap[playerName][lastCardPos]
-    lastCardTruthValues = game_data.players[playerIndex].hand[lastCardPos]
-    lastCard = (lastCardTruthValues.value, lastCardTruthValues.color)
-    if (len(lastCardHints[1]) > 1 and len(lastCardHints[0]) > 1 and
-        isCardDangerous(lastCard, game_data) and not hasPlayableCard):
+    lastCard = game_data.players[playerIndex].hand[lastCardPos]
+    lastCard = (lastCard.value, lastCard.color)
+    if (isCardDangerous(lastCard, game_data) and len(lastCardHints[1]) > 1 and
+        len(lastCardHints[0]) > 1 and not hasPlayableCard):
         hintType = None
         hintContent = None
         # if it's a 5 and the number hint is not given
@@ -270,12 +274,10 @@ def findGivableHint(playerName, playerIndex, game_data, hintMap):
         elif (len(lastCardHints[1]) > 1):
             hintType = "color"
             hintContent = lastCard[1]
-        elif (len(lastCardHints[0]) > 1):
+        else:
             hintType = "value"
             hintContent = lastCard[0]
-        else:
-            hintType = "color"
-            hintContent = lastCard[1]
+        print("Give hint type 2")
         return f"hint {hintType} {playerName} {hintContent}"
 
     return None
@@ -333,7 +335,7 @@ def updateHintMap(game_data, hintMap, playerName):
         if count == 0:
             for i in range(5):
                 if color in hintMap[playerName][i][1]:
-                    hintMap[playerName][i][1].remove(value)
+                    hintMap[playerName][i][1].remove(color)
     return hintMap
 
 def printHintMap(hintMap, game_data):
@@ -362,9 +364,9 @@ def play(playerName, status, game_data, hintMap):
     lastOptimisticCards = getLastOptimistCardsOfPlayer(hintMap, playerName)
     # deductions contains the list of possible cards for each position 
     # in a player's hand given current public information
-    deductions = getDeductions(playerName, game_data, hintMap)
     hintMap = updateHintMap(game_data, hintMap, playerName)
-
+    deductions = getDeductions(playerName, game_data, hintMap)
+    
     # Try to find a definitely playable card
     for i in range(game_data.handSize):
         playable = True
@@ -378,7 +380,7 @@ def play(playerName, status, game_data, hintMap):
             return f"play {i}"
 
     # If strike tokens < 2, try to play an optimistic card
-    if (game_data.usedStormTokens < 2 and len(lastOptimisticCards) > 0):
+    if (game_data.usedStormTokens < 2 and len(lastOptimisticCards) == 1):
         # find the most recent optimist card that may be playable and play it
         for i in lastOptimisticCards:
             # Count positive cases vs all cases
@@ -403,7 +405,6 @@ def play(playerName, status, game_data, hintMap):
             elif (not playerKnowsWhatToPlay(player.name, index, game_data, hintMap)):
                 action = findGivableHint(player.name, index, game_data, hintMap)
                 if (action != None):
-                    print("Give hint ")
                     return action
 
     # TODO: nothing gets ever discarded, WHY?

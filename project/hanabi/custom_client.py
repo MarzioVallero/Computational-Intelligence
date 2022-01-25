@@ -186,7 +186,11 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                 hintMap[data.lastPlayer] = []
                 for i in range(5):
                     hintMap[data.lastPlayer].append([[1, 2, 3, 4, 5], ["green", "red", "blue", "yellow", "white"], False])
-            hintMap[data.lastPlayer][data.cardHandIndex] = [[1, 2, 3, 4, 5], ["green", "red", "blue", "yellow", "white"], False]
+            for i in range(data.cardHandIndex, data.handLength):
+                if(i == data.handLength - 1):
+                    hintMap[data.lastPlayer][i] = [[1, 2, 3, 4, 5], ["green", "red", "blue", "yellow", "white"], False]
+                else:
+                    hintMap[data.lastPlayer][i] = hintMap[data.lastPlayer][i+1]
             inputManger.release()
             socketManager.acquire()
         if type(data) is GameData.ServerPlayerMoveOk:
@@ -197,7 +201,11 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                 hintMap[data.lastPlayer] = []
                 for i in range(5):
                     hintMap[data.lastPlayer].append([[1, 2, 3, 4, 5], ["green", "red", "blue", "yellow", "white"], False])
-            hintMap[data.lastPlayer][data.cardHandIndex] = [[1, 2, 3, 4, 5], ["green", "red", "blue", "yellow", "white"], False]
+            for i in range(data.cardHandIndex, data.handLength):
+                if(i == data.handLength - 1):
+                    hintMap[data.lastPlayer][i] = [[1, 2, 3, 4, 5], ["green", "red", "blue", "yellow", "white"], False]
+                else:
+                    hintMap[data.lastPlayer][i] = hintMap[data.lastPlayer][i+1]
             inputManger.release()
             socketManager.acquire()
         if type(data) is GameData.ServerPlayerThunderStrike:
@@ -207,7 +215,11 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                 hintMap[data.lastPlayer] = []
                 for i in range(5):
                     hintMap[data.lastPlayer].append([[1, 2, 3, 4, 5], ["green", "red", "blue", "yellow", "white"], False])
-            hintMap[data.lastPlayer][data.cardHandIndex] = [[1, 2, 3, 4, 5], ["green", "red", "blue", "yellow", "white"], False]
+            for i in range(data.cardHandIndex, data.handLength):
+                if(i == data.handLength - 1):
+                    hintMap[data.lastPlayer][i] = [[1, 2, 3, 4, 5], ["green", "red", "blue", "yellow", "white"], False]
+                else:
+                    hintMap[data.lastPlayer][i] = hintMap[data.lastPlayer][i+1]
             inputManger.release()
             socketManager.acquire()
         if type(data) is GameData.ServerHintData:
