@@ -2,7 +2,6 @@
 
 import random
 
-from matplotlib.pyplot import table
 import GameData
 from collections import Counter
 
@@ -104,9 +103,9 @@ def getDeductions(playerName, game_data, hintMap):
     possibleCards = getPossibleCards(game_data)
     for (i, v, c) in combinations:
         if (i not in deductions):
-                    deductions[i] = []
+            deductions[i] = []
         if ((v in hintMap[playerName][i][0]) and (c in hintMap[playerName][i][1]) and isCardPossible(v, c, possibleCards)):
-            deductions[i].append((v, c, 0))
+            deductions[i].append((v, c))
     return deductions
 
 def stackToTupleList(stack):
@@ -339,11 +338,11 @@ def findDiscardIndex(playerName, game_data, hintMap):
 # If all cards of a given value or color have been played,
 # implicitly I know they can't be among my cards
 def updateHintMap(game_data, hintMap, playerName):
-    if(playerName not in hintMap):
-        hintMap[playerName] = []
-        for i in range(5):
-            hintMap[playerName].append([[1, 2, 3, 4, 5], ["green", "red", "blue", "yellow", "white"], False])
-        return hintMap
+    for player in game_data.players:  
+        if(player.name not in hintMap):
+            hintMap[player.name] = []
+            for i in range(5):
+                hintMap[player.name].append([[1, 2, 3, 4, 5], ["green", "red", "blue", "yellow", "white"], False])      
     possibleCards = getPossibleCards(game_data)
     for value in numbers:
         count = sum(map(lambda x : x[0] == value, possibleCards))
@@ -359,19 +358,23 @@ def updateHintMap(game_data, hintMap, playerName):
                     hintMap[playerName][i][1].remove(color)
     return hintMap
 
-def printHintMap(hintMap, game_data):
+def printHintMap(hintMap):
+    if(not hintMap):
+        return
     print("Hint Map:")
-    for player in game_data.players:
-        print(f"    {player.name} hints:")
-        if(player.name not in hintMap):
+    players = list(hintMap.keys())
+    players.sort()
+    for player in players:
+        print(f"    {player} hints:")
+        if(player not in hintMap):
             print("No information")
         else:
-            for entry in hintMap[player.name]:
+            for entry in hintMap[player]:
                 print(entry)
 
 def play(playerName, status, game_data, hintMap):
-    printHintMap(hintMap, game_data)
-    printGameStats(game_data)
+    #printHintMap(hintMap)
+    #printGameStats(game_data)
 
     # A hidden card has an array of deductions, i.e. possible values with deduction levels
     # A hidden card is said to be "optimistic" when it's (one of) the last card(s) that was designated for a hint
@@ -401,6 +404,9 @@ def play(playerName, status, game_data, hintMap):
             return f"play {i}"
 
     # If storm tokens < 2, try to play an optimistic card
+    # Add check on len(lastOptimisticCards)
+    # Invert not isLastDiscardable
+    # Remove all other optimistic cards before committing play
     if (game_data.usedStormTokens < 2):
         # find the most recent optimist card that may be playable and play it
         for i in lastOptimisticCards:
@@ -436,7 +442,7 @@ def play(playerName, status, game_data, hintMap):
             return f"discard {discardableIndex}"
 
     # If 1st play or I got nothing better to do, give a hint on unhinted 5s or 2s
-    if (isFirstMove(game_data) or game_data.usedNoteTokens < 8):
+    if (isFirstMove(game_data)):
         index = -1
         for player in game_data.players:
             index = index + 1
@@ -463,13 +469,15 @@ def play(playerName, status, game_data, hintMap):
                     print("Give hint type 4")
                     return f"hint color {player.name} {card.color}"
 
+    # Add somewhat useful hint (for information completion)
+
     # Discard a card only based on how little I know about it 
     # (dangerous cards should be always hinted to immediately)
-    #if (game_data.usedNoteTokens > 0):
-    #    discardableIndex = findDiscardIndex(playerName, game_data, hintMap)
-    #    if (discardableIndex != -1):
-    #        print("Discard card type 2")
-    #        return f"discard {discardableIndex}"
+    if (game_data.usedNoteTokens > 0):
+        discardableIndex = findDiscardIndex(playerName, game_data, hintMap)
+        if (discardableIndex != -1):
+            print("Discard card type 2")
+            return f"discard {discardableIndex}"
 
     # If none of the above, do a random action
     # Just avoid getting a 0 score
@@ -478,9 +486,7 @@ def play(playerName, status, game_data, hintMap):
     randomOtherPlayer = random.choice([player for player in game_data.players if player.name != playerName])
     randomType = random.choice(["value", "color"])
     randomHint = randomOtherPlayer.hand[0].value if randomType == "value" else randomOtherPlayer.hand[0].color
-    if (game_data.usedStormTokens < 2):
-        return f"play {randomChoice}"
-    elif (game_data.usedNoteTokens > 0):
-        return f"discard {randomChoice}"
-    else:
+    if (game_data.usedNoteTokens < 8):
         return f"hint {randomType} {randomOtherPlayer.name} {randomHint}"
+    else:
+        return f"discard {randomChoice}"

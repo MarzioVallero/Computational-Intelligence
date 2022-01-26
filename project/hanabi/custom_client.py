@@ -41,11 +41,13 @@ def manageInput():
         data = s.recv(DATASIZE)
         data = GameData.GameData.deserialize(data)
 
+        #ai.printHintMap(hintMap)
+
         if type(data) is GameData.ServerGameStateData and data.currentPlayer == playerName:
             command = ai.play(playerName, status, data, hintMap)
             print(f"AI chosen command: {command}")
             # Used to block before executing each command
-            #a = input()
+            #input()
         else:
             socketManager.release()
             continue
@@ -262,7 +264,7 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             stdout.flush()
             #run = False
             print("Ready for a new game!")
-            if (playerName == "Player0"):
+            if (playerName == "Mars"):
                 with open("results.dat", "a") as myfile:
                     myfile.write(f"{data.score}\n")
             numGames = numGames + 1
@@ -270,8 +272,6 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                 run = False
                 os._exit(0)
             hintMap = {}
-            if data.score == 0:
-                input()
             sleep(1)
             inputManger.release()
             socketManager.acquire()
