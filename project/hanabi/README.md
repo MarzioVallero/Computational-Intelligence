@@ -49,3 +49,13 @@ Commands for client:
   + type: 'color' or 'value'
   + destinatary: name of the person you want to ask the hint to
 + discard \<num>: discard the card *num* (\[0-4]) from your hand
+
+# AI client
+
+The AI client automatically connects to the specified server and port.  
+It will infer the best move based on publicly available knowledge.  
+Most of all, it actively avoids any illegal move and will always strive to get a score different from 0.  
+
+# run.py script
+
+Utility used for testing multiple ai_clients.py at once.  

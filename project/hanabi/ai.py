@@ -132,7 +132,7 @@ def isCardDiscardable(deductionsOfSingleCard, game_data):
     for deduction in deductionsOfSingleCard:
         if (isCardEverPlayable(deduction, game_data)):
             discardable = False
-    if discardable:
+    if discardable and len(deductionsOfSingleCard) > 0:
         return True
 
     # Don't discard necessarily dangerous cards
@@ -140,7 +140,7 @@ def isCardDiscardable(deductionsOfSingleCard, game_data):
     for deduction in deductionsOfSingleCard:
         if (not isCardDangerous(deduction, game_data)):
             dangerous = False
-    if dangerous:
+    if dangerous and len(deductionsOfSingleCard) > 0:
         return False
     return True
 
@@ -203,12 +203,15 @@ def playerKnowsWhatToPlay(playerName, index, game_data, hintMap):
         hintMap[playerName] = []
         for i in range(5):
             hintMap[playerName].append([[1, 2, 3, 4, 5], ["green", "red", "blue", "yellow", "white"], False])
+    count = 0
     cardIndex = -1
     for card in game_data.players[index].hand:
         cardIndex = cardIndex + 1
         cardTruth = (card.value, card.color)
         if (hintMap[playerName][cardIndex][2] == True and isCardPlayable(cardTruth, game_data)):
-            return True
+            count = count + 1
+    if(count == 1):
+        return True
     return False
 
 # Find the first playable card and give a hint on it. If possible, give an optimistic hint
@@ -296,7 +299,7 @@ def findBestDiscardIndex(playerName, game_data, hintMap, deductions):
         for deduction in deductions[i]:
             if (isCardEverPlayable(deduction, game_data)):
                 discardable = False
-        if discardable:
+        if discardable and len(deductions[i]) > 0:
             return i
 
         # If the card is unclued and not dangerous
@@ -399,7 +402,7 @@ def play(playerName, status, game_data, hintMap):
         for deduction in deductions[i]:
             if (not isCardPlayable(deduction, game_data)):
                 playable = False
-        if playable:
+        if playable and len(deductions[i]) > 0:
             print("Definitely playable card ")
             return f"play {i}"
 
@@ -415,7 +418,7 @@ def play(playerName, status, game_data, hintMap):
                 if (isCardPlayable(deduction, game_data) and not isLastDiscardable):
                     playable = True
                     break
-            if playable:
+            if playable and len(deductions[i]) > 0:
                 for card in range(game_data.handSize):
                     hintMap[playerName][card][2] = False
                 print("Optimistic play ")
@@ -442,7 +445,7 @@ def play(playerName, status, game_data, hintMap):
             return f"discard {discardableIndex}"
 
     # If 1st play or I got nothing better to do, give a hint on unhinted 5s or 2s
-    if (isFirstMove(game_data)):
+    if (isFirstMove(game_data) or game_data.usedNoteTokens < 8):
         index = -1
         for player in game_data.players:
             index = index + 1
@@ -453,7 +456,7 @@ def play(playerName, status, game_data, hintMap):
             for card in nextPlayerHand:
                 cardIndex = cardIndex + 1
                 if (card.value == 5 and len(hintMap[player.name][cardIndex][0]) > 1):
-                    print("First move hint ")
+                    print("Give hint type 3")
                     return f"hint value {player.name} 5"
                 elif (card.value == 5 and len(hintMap[player.name][cardIndex][1]) > 1):
                     print("Give hint type 3")
@@ -463,13 +466,13 @@ def play(playerName, status, game_data, hintMap):
             for card in nextPlayerHand:
                 cardIndex = cardIndex + 1
                 if (card.value == 2 and len(hintMap[player.name][cardIndex][0]) > 1):
-                    print("First move hint ")
+                    print("Give hint type 4")
                     return f"hint value {player.name} 2"
                 elif (card.value == 2 and len(hintMap[player.name][cardIndex][1]) > 1):
                     print("Give hint type 4")
                     return f"hint color {player.name} {card.color}"
 
-    # Add somewhat useful hint (for information completion)
+    # IDEA: Add somewhat useful hint (for information completion)
 
     # Discard a card only based on how little I know about it 
     # (dangerous cards should be always hinted to immediately)
@@ -478,7 +481,7 @@ def play(playerName, status, game_data, hintMap):
         if (discardableIndex != -1):
             print("Discard card type 2")
             return f"discard {discardableIndex}"
-
+            
     # If none of the above, do a random action
     # Just avoid getting a 0 score
     print("DESPERATE MOVE")
