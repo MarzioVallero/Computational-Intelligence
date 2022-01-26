@@ -181,7 +181,7 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             dataOk = True
             print("Invalid action performed. Reason:")
             print(data.message)
-        # This is used to manage discard commands, why there is no report for which card has been discarded????
+        # This is used to manage discard commands
         if type(data) is GameData.ServerActionValid:
             dataOk = True
             print(f"{data.lastPlayer} discarded card number {data.cardHandIndex}")
@@ -195,6 +195,8 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                     hintMap[data.lastPlayer][i] = [[1, 2, 3, 4, 5], ["green", "red", "blue", "yellow", "white"], False]
                 else:
                     hintMap[data.lastPlayer][i] = hintMap[data.lastPlayer][i+1]
+            for card in range(data.handLength):
+                hintMap[data.lastPlayer][card][2] = False
             inputManger.release()
             socketManager.acquire()
         if type(data) is GameData.ServerPlayerMoveOk:
@@ -210,6 +212,8 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                     hintMap[data.lastPlayer][i] = [[1, 2, 3, 4, 5], ["green", "red", "blue", "yellow", "white"], False]
                 else:
                     hintMap[data.lastPlayer][i] = hintMap[data.lastPlayer][i+1]
+            for card in range(data.handLength):
+                hintMap[data.lastPlayer][card][2] = False
             inputManger.release()
             socketManager.acquire()
         if type(data) is GameData.ServerPlayerThunderStrike:
@@ -224,6 +228,8 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                     hintMap[data.lastPlayer][i] = [[1, 2, 3, 4, 5], ["green", "red", "blue", "yellow", "white"], False]
                 else:
                     hintMap[data.lastPlayer][i] = hintMap[data.lastPlayer][i+1]
+            for card in range(data.handLength):
+                hintMap[data.lastPlayer][card][2] = False
             inputManger.release()
             socketManager.acquire()
         if type(data) is GameData.ServerHintData:

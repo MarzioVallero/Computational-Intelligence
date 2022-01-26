@@ -404,8 +404,6 @@ def play(playerName, status, game_data, hintMap):
             return f"play {i}"
 
     # If storm tokens < 2, try to play an optimistic card
-    # Add check on len(lastOptimisticCards)
-    # Invert not isLastDiscardable
     # Remove all other optimistic cards before committing play
     if (game_data.usedStormTokens < 2):
         # find the most recent optimist card that may be playable and play it
@@ -418,6 +416,8 @@ def play(playerName, status, game_data, hintMap):
                     playable = True
                     break
             if playable:
+                for card in range(game_data.handSize):
+                    hintMap[playerName][card][2] = False
                 print("Optimistic play ")
                 return f"play {i}"
 
