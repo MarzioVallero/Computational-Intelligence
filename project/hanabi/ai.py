@@ -1,15 +1,29 @@
 #!/usr/bin/env python3
 
 import random
-
 import GameData
 from collections import Counter
 
 colors = ["green", "red", "blue", "yellow", "white"]
 numbers = [1, 2, 3, 4, 5]
 numberFrequency = [3, 2, 2, 2, 1]
-start = True
 
+# Pretty print for the hintMap
+def printHintMap(hintMap):
+    if(not hintMap):
+        return
+    print("Hint Map:")
+    players = list(hintMap.keys())
+    players.sort()
+    for player in players:
+        print(f"    {player} hints:")
+        if(player not in hintMap):
+            print("No information")
+        else:
+            for entry in hintMap[player]:
+                print(entry)
+
+# Pretty print for game stats
 def printGameStats(data):
     if type(data) is GameData.ServerGameStateData:
         dataOk = True
@@ -29,6 +43,8 @@ def printGameStats(data):
         print("Note tokens used: " + str(data.usedNoteTokens) + "/8")
         print("Storm tokens used: " + str(data.usedStormTokens) + "/3")
 
+# Returns an array of cards labeled as optimistic in the hintMap,
+# i.e. they are the last cards which got hited to that player
 def getLastOptimistCardsOfPlayer(hintMap, playerName):
     optimisticCards = []
     if(playerName not in hintMap):
@@ -38,6 +54,7 @@ def getLastOptimistCardsOfPlayer(hintMap, playerName):
             optimisticCards.append(card)
     return optimisticCards
 
+# Returns a list containing all the cards in a full deck, with duplicates
 def getFullDeck():
     fullDeck = []
     for _ in range(3):
@@ -72,6 +89,8 @@ def getFullDeck():
         fullDeck.append((5, "white"))
     return fullDeck
 
+# Returns a list without duplicates containing all the cards which cannot
+# be excluded by public knowledge available to the player
 def getPossibleCards(game_data):
     tableCards = []
     for color in colors:
@@ -96,7 +115,7 @@ def getPossibleCards(game_data):
 
     return rem
 
-# Get dict of tuples indexed by cardIndex containing (value, color, deductionLevel)
+# Get dict of tuples indexed by cardIndex containing (value, color)
 def getDeductions(playerName, game_data, hintMap):
     deductions = {}
     combinations = [(i, v, c) for i in range(game_data.handSize) for v in numbers for c in colors]
@@ -108,12 +127,14 @@ def getDeductions(playerName, game_data, hintMap):
             deductions[i].append((v, c))
     return deductions
 
+# Returns a list of tuples (value, color) given a list of Card Objects 
 def stackToTupleList(stack):
     tupleList = []
     for card in stack:
         tupleList.append((card.value, card.color))
     return tupleList
 
+# Determines whether the current player is about to make the first move of a game
 def isFirstMove(data):
     tableCards = []
     for color in colors:
@@ -126,6 +147,8 @@ def isFirstMove(data):
     else:
         return False
 
+# Determines if a card is safely discardable.
+# Either all its deductions are never playable or we can assure that none of its deductions are dangerous
 def isCardDiscardable(deductionsOfSingleCard, game_data):
     # AI can discard a card that can never be played (already played or because of other discards)
     discardable = True
@@ -144,6 +167,7 @@ def isCardDiscardable(deductionsOfSingleCard, game_data):
         return False
     return True
 
+# Check if the current card is the last possible safely discardable card in a player's hand
 def isLastDiscardableCard(deductions, cardIndex, game_data):
     lastDiscardableCard = True
     if(cardIndex == game_data.handSize-1):
@@ -154,23 +178,26 @@ def isLastDiscardableCard(deductions, cardIndex, game_data):
             return lastDiscardableCard
     return lastDiscardableCard
 
+# Check if a tuple (value, color) is possible given the current game state
 def isCardPossible(value, color, possibleCards):
     if((value, color) in possibleCards):
         return True
     else:
         return False
 
+# Check if the card can be played given the current game state
 def isCardPlayable(cardInfo, game_data):
     tableCards = []
     for number in game_data.tableCards[cardInfo[1]]:
         tableCards.append((number, cardInfo[1]))
     # Check if the previous card with respect to the one we're checking has already been played
-    isPreviousHere = (cardInfo[0] == 1 or (cardInfo[0]-1, cardInfo[1]) in tableCards)
+    #isPreviousHere = (cardInfo[0] == 1 or (cardInfo[0]-1, cardInfo[1]) in tableCards)
     # Check if the current card has not yet been played
-    isSameNotHere = ((cardInfo[0], cardInfo[1]) not in tableCards)
+    #isSameNotHere = ((cardInfo[0], cardInfo[1]) not in tableCards)
     #return isPreviousHere and isSameNotHere
     return (len(tableCards) == (cardInfo[0] - 1))
 
+# Checks if the card is still playable in the future or if it's a dead card
 def isCardEverPlayable(cardInfo, game_data):
     tableCards = []
     for number in game_data.tableCards[cardInfo[1]]:
@@ -188,6 +215,7 @@ def isCardEverPlayable(cardInfo, game_data):
                 return False
     return True
 
+# Checks if a card is the last possible card of that type available
 def isCardDangerous(cardInfo, game_data):
     if (not isCardEverPlayable(cardInfo, game_data)):
         return False
@@ -197,7 +225,7 @@ def isCardDangerous(cardInfo, game_data):
         return True
     return False
 
-# If player's last hinted card is playable, return True. Else False.
+# If player's last hinted card is playable right now
 def playerKnowsWhatToPlay(playerName, index, game_data, hintMap):
     if(playerName not in hintMap):
         hintMap[playerName] = []
@@ -213,6 +241,27 @@ def playerKnowsWhatToPlay(playerName, index, game_data, hintMap):
     if(count == 1):
         return True
     return False
+
+# Orders all the known hints about value and color of a player by frequency,
+# then returns an hint about the first unsure value/color with the smallest frequency
+def findWideHint(playerName, playerIndex, game_data, hintMap):
+    countCommonStats = {'1':0, '2':0, '3':0, '4':0, '5':0, 'green':0, 'red':0, 'blue':0, 'yellow':0, 'white':0}
+    for card in hintMap[playerName]:
+        for value in card[0]:
+            countCommonStats[str(value)] = countCommonStats[str(value)] + 1
+        for color in card[1]:
+            countCommonStats[color] = countCommonStats[color] + 1
+
+    valuesInHand = [card.value for card in game_data.players[playerIndex].hand]
+    colorsInHand = [card.color for card in game_data.players[playerIndex].hand]
+
+    # From tests, it seems that providing a hint on a card with narrowed options
+    # is better than giving hints on cards with broader options (because it advances useful knowledge)
+    for key, count in sorted(countCommonStats.items(), key=lambda item: item[1], reverse=False):
+        if count > 1 and ((key in valuesInHand) or (key in colorsInHand)):
+            hintType = "color" if key in colors else "value"
+            return f"hint {hintType} {playerName} {key}"
+    return None
 
 # Find the first playable card and give a hint on it. If possible, give an optimistic hint
 def findGivableHint(playerName, playerIndex, game_data, hintMap):
@@ -279,6 +328,7 @@ def findGivableHint(playerName, playerIndex, game_data, hintMap):
 
     return None
 
+# Returns the index of the first safely discardable card in a player's hand, if any
 def findBestDiscardIndex(playerName, game_data, hintMap, deductions):
     uncluedDiscardableCard = False
     discardableIndex = -1
@@ -314,7 +364,7 @@ def findBestDiscardIndex(playerName, game_data, hintMap, deductions):
 
     return discardableIndex
 
-
+# Returns the index of the card with the least information in a player's hand
 def findDiscardIndex(playerName, game_data, hintMap):
     discardIndex = -1
 
@@ -361,31 +411,17 @@ def updateHintMap(game_data, hintMap, playerName):
                     hintMap[playerName][i][1].remove(color)
     return hintMap
 
-def printHintMap(hintMap):
-    if(not hintMap):
-        return
-    print("Hint Map:")
-    players = list(hintMap.keys())
-    players.sort()
-    for player in players:
-        print(f"    {player} hints:")
-        if(player not in hintMap):
-            print("No information")
-        else:
-            for entry in hintMap[player]:
-                print(entry)
-
-def play(playerName, status, game_data, hintMap):
+def play(playerName, game_data, hintMap):
     #printHintMap(hintMap)
     #printGameStats(game_data)
 
-    # A hidden card has an array of deductions, i.e. possible values with deduction levels
+    # A hidden card has an array of deductions, i.e. possible values given current information.
     # A hidden card is said to be "optimistic" when it's (one of) the last card(s) that was designated for a hint
     # since the player last played.
     # When there are several possible deductions for a card, we always assume that playing it/ discarding it
-    # leads to the worst possible outcome, unless it's an optimist card in which case we trust our partners :)
-    # Before playing, each deduction will be assigned a status (IDeductionStatus)
-    # (playing a 5) > (playing a playable card) > (happy discard) > (giving a hint) > (discard) > (sad discard) > (sad hint)
+    # leads to the worst possible outcome, unless it's an optimist card in which case we trust the other players.
+    # (playing a sure card) > (playing an optimistic card) > (happy discard) > 
+    # (giving a precise hint) > (discard) > (giving a general hint) > (sad discard) > (random move)
 
     # Get statistics
     lastOptimisticCards = getLastOptimistCardsOfPlayer(hintMap, playerName)
@@ -419,6 +455,7 @@ def play(playerName, status, game_data, hintMap):
                     playable = True
                     break
             if playable and len(deductions[i]) > 0:
+                # Reset optimistic hints for next turns
                 for card in range(game_data.handSize):
                     hintMap[playerName][card][2] = False
                 print("Optimistic play ")
@@ -472,7 +509,19 @@ def play(playerName, status, game_data, hintMap):
                     print("Give hint type 4")
                     return f"hint color {player.name} {card.color}"
 
-    # IDEA: Add somewhat useful hint (for information completion)
+    # Give somewhat useful hint (for information completion)
+    if (game_data.usedNoteTokens < 8):
+        # If someone has a playable card (but with some hint uncertainty), give hint
+        playerIndex = -1
+        for player in game_data.players:
+            playerIndex = playerIndex + 1
+            if(player.name == playerName):
+                continue
+            else:
+                action = findWideHint(player.name, playerIndex, game_data, hintMap)
+                if (action != None):
+                    print("Give hint type 5")
+                    return action
 
     # Discard a card only based on how little I know about it 
     # (dangerous cards should be always hinted to immediately)
@@ -483,7 +532,7 @@ def play(playerName, status, game_data, hintMap):
             return f"discard {discardableIndex}"
             
     # If none of the above, do a random action
-    # Just avoid getting a 0 score
+    # Just avoid getting a 0 score (never play a random card)
     print("DESPERATE MOVE")
     randomChoice = random.choice(range(game_data.handSize))
     randomOtherPlayer = random.choice([player for player in game_data.players if player.name != playerName])

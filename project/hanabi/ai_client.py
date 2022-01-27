@@ -2,7 +2,8 @@
 
 from sys import argv, stdout
 from threading import Thread, Semaphore
-from time import sleep
+from time import sleep, time
+from tkinter import N
 import GameData
 import socket
 from constants import *
@@ -27,6 +28,9 @@ hintMap = {}
 socketManager = Semaphore(0)
 inputManger = Semaphore(0)
 numGames = 0
+currentTotalScore = 0
+maxScore = 0
+minScore = 25
 
 def manageInput():
     global run
@@ -36,7 +40,6 @@ def manageInput():
 
     while run:
         inputManger.acquire()
-        print("Input manager alive")
         s.send(GameData.ClientGetGameStateRequest(playerName).serialize())
         data = s.recv(DATASIZE)
         data = GameData.GameData.deserialize(data)
@@ -44,7 +47,7 @@ def manageInput():
         #ai.printHintMap(hintMap)
 
         if type(data) is GameData.ServerGameStateData and data.currentPlayer == playerName:
-            command = ai.play(playerName, status, data, hintMap)
+            command = ai.play(playerName, data, hintMap)
             print(f"AI chosen command: {command}")
             # Used to block before executing each command
             #input()
@@ -141,40 +144,15 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
     print("[" + playerName + " - " + status + "]: ", end="")
     inputManger.release()
     socketManager.acquire()
+    timeStart = time()
     while run:
-        print("socket manager alive")
         dataOk = False
         data = s.recv(DATASIZE)
         if not data:
             continue
         data = GameData.GameData.deserialize(data)
-        if type(data) is GameData.ServerPlayerStartRequestAccepted:
-            dataOk = True
-            print("Ready: " + str(data.acceptedStartRequests) + "/"  + str(data.connectedPlayers) + " players")
-            data = s.recv(DATASIZE)
-            data = GameData.GameData.deserialize(data)
-        if type(data) is GameData.ServerStartGameData:
-            dataOk = True
-            print("Game start!")
-            s.send(GameData.ClientPlayerReadyData(playerName).serialize())
-            status = statuses[1]
         if type(data) is GameData.ServerGameStateData:
             dataOk = True
-            print("Current player: " + data.currentPlayer)
-            print("Player hands: ")
-            for p in data.players:
-                print(p.toClientString())
-            print("Table cards: ")
-            for pos in data.tableCards:
-                print(pos + ": [ ")
-                for c in data.tableCards[pos]:
-                    print(c.toClientString() + " ")
-                print("]")
-            print("Discard pile: ")
-            for c in data.discardPile:
-                print("\t" + c.toClientString())            
-            print("Note tokens used: " + str(data.usedNoteTokens) + "/8")
-            print("Storm tokens used: " + str(data.usedStormTokens) + "/3")
             inputManger.release()
             socketManager.acquire()
         if type(data) is GameData.ServerActionInvalid:
@@ -270,15 +248,24 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             stdout.flush()
             #run = False
             print("Ready for a new game!")
+            timeEnd = time()
             if (playerName == "Mars"):
                 with open("results.dat", "a") as myfile:
                     myfile.write(f"{data.score}\n")
             numGames = numGames + 1
+            print(f"Game number {numGames} completed")
+            print(f"Game time: {round(timeEnd - timeStart, 4)} seconds")
+            currentTotalScore = currentTotalScore + data.score
+            maxScore = data.score if data.score > maxScore else maxScore
+            minScore = data.score if data.score < minScore else minScore
+            print(f"Current average score: {currentTotalScore / numGames}\nMaximum Score: {maxScore}\nMinimum Score: {minScore}")
             if(numGames == 100):
                 run = False
+                input()
                 os._exit(0)
             hintMap = {}
-            sleep(1)
+            sleep(0.5)
+            timeStart = time()
             inputManger.release()
             socketManager.acquire()
         if not dataOk:
